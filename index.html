@@ -2,39 +2,29 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; connect-src 'self'; worker-src 'self'; frame-src https://script.google.com; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'; connect-src https://script.google.com https://script.googleusercontent.com; base-uri 'none'; form-action 'none'; frame-src 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#1E5B43">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="ميزانية البيت">
 <title>ميزانية البيت</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/png" href="icons/favicon-48.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="favicon-48.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="frameBox">
-  <iframe id="app" title="ميزانية البيت" referrerpolicy="no-referrer" allow="clipboard-write; web-share"></iframe>
-</div>
-
-<div id="splash" class="screen">
-  <img src="icons/icon-192.png" alt="" width="96" height="96">
-  <p>ميزانية البيت</p>
-  <span class="dots"><i></i><i></i><i></i></span>
-</div>
-
-<div id="offline" class="screen" hidden>
-  <img src="icons/icon-192.png" alt="" width="72" height="72">
-  <p>مفيش إنترنت دلوقتي</p>
-  <small>البرنامج محتاج نت عشان يجيب الأرقام من الشيت.</small>
-  <button id="retry" type="button">جرّب تاني</button>
-</div>
-
+<div class="wrap" id="app"><div class="center"><div class="spin"></div><div class="muted">بنجهّز البيت...</div></div></div>
+<div id="sheet"></div>
+<div id="toast"></div>
+<div id="busy"></div>
+<input type="file" id="restoreInput" accept=".json,.xlsx,application/json" class="hide">
 <script src="app.js"></script>
 </body>
 </html>

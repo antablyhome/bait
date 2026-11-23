@@ -1,11 +1,10 @@
-/* Service worker بسيط جداً: بيحفظ ملفات الغلاف بس (الصفحة واللوجو) عشان الموبايل يعتبره تطبيق.
-   مابيلمسش أي طلب رايح لجوجل، ومابيحفظش أي بيانات من البرنامج.
-   لو عدّلت أي ملف هنا، زوّد رقم الإصدار ده (v1 -> v2) عشان الموبايلات تاخد النسخة الجديدة. */
-var CACHE = 'wrapper-v1';
+/* Service worker بسيط: بيحفظ ملفات الواجهة بس (الصفحة والتصميم واللوجو) عشان البرنامج يفتح بسرعة ويتثبّت كتطبيق.
+   مابيلمسش أي طلب رايح لجوجل، ومابيحفظش أي أرقام ولا بيانات.
+   لو عدّلت أي ملف هنا، زوّد رقم الإصدار ده (v2 -> v3) عشان الموبايلات تاخد النسخة الجديدة. */
+var CACHE = 'bait-v2';
 var FILES = [
   './', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest',
-  'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png',
-  'icons/apple-touch-icon.png', 'icons/favicon-48.png'
+  'icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png', 'favicon-48.png'
 ];
 
 self.addEventListener('install', function (e) {
@@ -20,9 +19,9 @@ self.addEventListener('activate', function (e) {
 
 self.addEventListener('fetch', function (e) {
   var req = e.request;
-  // Only our own wrapper files. Everything else (Google, the app, the sheet) is not touched at all.
+  // ملفاتنا بس. أي حاجة رايحة لجوجل (السيرفر، الشيت، الخطوط) مش بنلمسها خالص.
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-  // Network first so updates show up right away; fall back to the saved copy when offline.
+  // من النت الأول عشان التحديثات توصل على طول، ولو مفيش نت ناخد النسخة المحفوظة.
   e.respondWith(
     fetch(req).then(function (res) {
       if (res && res.ok) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); }
