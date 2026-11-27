@@ -1,7 +1,7 @@
 /* Service worker بسيط: بيحفظ ملفات الواجهة بس (الصفحة والتصميم واللوجو) عشان البرنامج يفتح بسرعة ويتثبّت كتطبيق.
    مابيلمسش أي طلب رايح لجوجل، ومابيحفظش أي أرقام ولا بيانات.
    لو عدّلت أي ملف هنا، زوّد رقم الإصدار ده (v2 -> v3) عشان الموبايلات تاخد النسخة الجديدة. */
-var CACHE = 'bait-v3';
+var CACHE = 'bait-v4';
 var FILES = [
   './', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png', 'favicon-48.png'
