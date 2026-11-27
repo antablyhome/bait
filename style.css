@@ -138,3 +138,12 @@ details.card summary{cursor:pointer;font-weight:600;list-style:none}
 details.card summary::-webkit-details-marker{display:none}
 .empty{color:var(--muted);font-size:14px;text-align:center;padding:14px 0}
 svg.chart{width:100%;height:auto;display:block}
+/* v1.4: الكمية والوحدة */
+.line{grid-template-columns:1fr 1fr 1fr 36px}
+.line .nm{grid-column:1 / 4}
+.line select.inp.un{grid-column:auto;min-height:40px;font-size:14px}
+.line select.inp.ct{grid-column:1 / 5}
+.shopadd{gap:10px}
+.shopadd .qrow{display:grid;grid-template-columns:1fr 1.2fr auto;gap:8px;align-items:end}
+.shopadd .qrow .btn{min-height:48px;padding:0 20px}
+.qty{display:inline-block;font-size:12px;font-weight:700;color:var(--pri);background:var(--bg);border-radius:8px;padding:1px 8px;margin-inline-start:4px}
