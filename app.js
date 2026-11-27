@@ -275,7 +275,7 @@ function viewMemberHome() {
     '<div class="bottom"><div class="in"><button class="btn warm" style="flex:1.3" data-a="ranOut">في حاجة خلصت؟</button><button class="btn ghost" style="flex:1" data-a="newPurchase">سجّل مشتريات</button></div></div>' + nav();
 }
 function purchaseRow(p) {
-  var names = p.items.map(function (i) { return i.name + (i.qty !== 1 ? ' × ' + i.qty : ''); }).join('، ');
+  var names = p.items.map(function (i) { return i.name + (i.qty !== 1 || (i.unit && i.unit !== 'عدد') ? ' ' + qtyLabel(i.qty, i.unit) : ''); }).join('، ');
   var cat = p.items[0] ? catName(p.items[0].category) : '';
   return '<button class="li" data-a="openPurchase" data-id="' + p.id + '"><div class="grow"><span style="font-size:14px">' + esc(names) + '</span><span class="xs muted">' + esc(cat) + ' · ' + dateLabel(p.date) +
     (p.paidByName ? ' · من جيب ' + esc(p.paidByName) : '') + (App.st.isAdmin && p.createdByName ? ' · ' + esc(p.createdByName) : '') + '</span></div><span class="sb" style="font-size:14px">' + fmt(p.total) + '</span></button>';
@@ -291,7 +291,7 @@ function viewAdminHome() {
   var tiles = '<section class="tiles"><div class="tile"><span>اتجمع' + (s.carry ? ' + مرحّل' : '') + '</span><b>' + fmt(s.base) + '</b></div><div class="tile"><span>اتصرف</span><b>' + fmt(s.spent) + '</b></div><div class="tile dark"><span>الباقي</span><b>' + fmt(s.remaining) + '</b></div></section>';
   var cashLine = '<div class="row xs muted" style="flex-wrap:wrap;gap:6px"><span>كاش في الإيد: <b style="color:var(--ink)">' + fmt(a.cashInHand) + '</b></span>' + (a.owedTotal ? '<span>على البيت للأعضاء: <b style="color:var(--ink)">' + fmt(a.owedTotal) + '</b></span>' : '') + (s.carry ? '<span>مرحّل من قبل: <b style="color:var(--ink)">' + fmt(s.carry) + '</b></span>' : '') + (s.setAside ? '<span>اتحوّش: <b style="color:var(--ink)">' + fmt(s.setAside) + '</b></span>' : '') + '</div>';
   var open = st.shopping.open;
-  var shop = open.length ? '<button class="alert" data-a="go" data-v="list">' + IC.warn + '<span style="flex:1" class="sm sb">' + open.length + ' ' + (open.length > 10 ? 'حاجة' : 'حاجات') + ' خلصت (' + open.slice(0, 3).map(function (x) { return esc(x.name); }).join('، ') + (open.length > 3 ? '...' : '') + ')</span>' + IC.chev + '</button>' : '';
+  var shop = open.length ? '<button class="alert" data-a="go" data-v="list">' + IC.warn + '<span style="flex:1" class="sm sb">' + open.length + ' ' + (open.length > 10 ? 'حاجة' : 'حاجات') + ' في القايمة (' + open.slice(0, 3).map(function (x) { return esc(x.name); }).join('، ') + (open.length > 3 ? '...' : '') + ')' + (st.shopping.estTotal ? ' · حوالي ' + fmt(st.shopping.estTotal) + ' ج' : '') + '</span>' + IC.chev + '</button>' : '';
   var mode = st.settings.contribMode === 'equal' ? 'متساوية · ' + fmt(st.settings.defaultShare) + ' للفرد' : 'حسب كل فرد';
   var avs = a.membersStatus.map(function (m) {
     var cls = '', txt = 'لسه';
@@ -361,7 +361,7 @@ function viewPurchases() {
 /* ---------- إضافة مشتريات ---------- */
 function newDraft(extra) {
   var d = { id: '', date: todayStr(), store: '', paidBy: 'house', items: [], shoppingIds: [], note: '', msg: '', pasteTotal: 0,
-    cur: { name: '', qty: '1', price: '', category: '' } };
+    cur: { name: '', qty: '1', unit: 'عدد', price: '', category: '' } };
   for (var k in extra || {}) d[k] = extra[k];
   return d;
 }
@@ -371,10 +371,13 @@ function viewAdd() {
   var quick = mergedCatalog().slice(0, 14);
   var c = d.cur;
   var lines = d.items.map(function (it, i) {
-    return '<div class="line"><input class="inp" data-bind="draft.items.' + i + '.name" value="' + esc(it.name) + '" aria-label="الحاجة"><input class="inp" type="number" inputmode="decimal" step="any" data-bind="draft.items.' + i + '.qty" data-total="1" value="' + esc(it.qty) + '" aria-label="الكمية"><input class="inp" type="number" inputmode="decimal" step="any" data-bind="draft.items.' + i + '.price" data-total="1" value="' + esc(it.price) + '" placeholder="السعر" aria-label="سعر الواحدة"><button class="x" data-a="delLine" data-i="' + i + '" aria-label="شيل">' + IC.x + '</button>' +
-      '<select class="inp" data-bind="draft.items.' + i + '.category" aria-label="التصنيف">' + cats.map(function (k) { return '<option value="' + k.id + '"' + (k.id === it.category ? ' selected' : '') + '>' + esc(k.name) + '</option>'; }).join('') + '</select></div>';
+    return '<div class="line"><input class="inp nm" data-bind="draft.items.' + i + '.name" value="' + esc(it.name) + '" aria-label="الحاجة"><button class="x" data-a="delLine" data-i="' + i + '" aria-label="شيل">' + IC.x + '</button>' +
+      '<input class="inp" type="number" inputmode="decimal" step="any" data-bind="draft.items.' + i + '.qty" data-total="1" value="' + esc(it.qty) + '" aria-label="الكمية">' +
+      '<select class="inp un" data-bind="draft.items.' + i + '.unit" data-line="' + i + '" aria-label="الوحدة">' + unitOpts(it.unit) + '</select>' +
+      '<input class="inp" type="number" inputmode="decimal" step="any" data-bind="draft.items.' + i + '.price" data-total="1" value="' + esc(it.price) + '" placeholder="السعر" aria-label="سعر الوحدة">' +
+      '<select class="inp ct" data-bind="draft.items.' + i + '.category" aria-label="التصنيف">' + cats.map(function (k) { return '<option value="' + k.id + '"' + (k.id === it.category ? ' selected' : '') + '>' + esc(k.name) + '</option>'; }).join('') + '</select></div>';
   }).join('');
-  var cart = d.items.length ? '<section class="card" style="gap:2px"><div class="row"><h2>الفاتورة (' + d.items.length + ')</h2><span class="xs muted">الحاجة · الكمية · سعر الواحدة</span></div>' + lines +
+  var cart = d.items.length ? '<section class="card" style="gap:2px"><div class="row"><h2>الفاتورة (' + d.items.length + ')</h2><span class="xs muted">الكمية · الوحدة · سعر الوحدة</span></div>' + lines +
     '<button class="btn soft sm" style="margin-top:8px" data-a="addEmptyLine">+ صف جديد</button>' + (d.pasteTotal ? '<div id="pasteCheck" style="margin-top:8px">' + pasteCheckHtml() + '</div>' : '') + '</section>' : '';
   var payOpts = '<div class="seg"><button class="' + (d.paidBy === 'house' ? 'on' : '') + '" data-a="paidBy" data-id="house">من فلوس البيت</button><button class="' + (d.paidBy === st.me.id ? 'on' : '') + '" data-a="paidBy" data-id="' + st.me.id + '">من جيبي</button></div>';
   if (st.isAdmin && st.members.length > 1) {
@@ -385,11 +388,13 @@ function viewAdd() {
     (d.msg ? '<div class="alert ' + (d.msgOk ? 'g' : 'bl') + ' sm">' + esc(d.msg) + '</div>' : '') +
     cart +
     '<div class="divider">' + (d.items.length ? 'ضيف حاجة كمان' : 'أو سجّل بإيدك') + '</div>' +
-    (quick.length ? '<div style="display:flex;flex-direction:column;gap:8px"><span class="sm muted">اشتريته قبل كده؟ دوسة واحدة</span><div class="chips">' + quick.map(function (q, i) { return '<button class="chip sm" data-a="quickAdd" data-i="' + i + '">' + esc(q.name) + (q.price ? ' <span class="xs muted">' + fmt(q.price) + '</span>' : '') + '</button>'; }).join('') + '</div></div>' : '') +
+    (quick.length ? '<div style="display:flex;flex-direction:column;gap:8px"><span class="sm muted">اشتريته قبل كده؟ دوسة واحدة</span><div class="chips">' + quick.map(function (q, i) { return '<button class="chip sm" data-a="quickAdd" data-i="' + i + '">' + esc(q.name) + (q.price ? ' <span class="xs muted">' + fmt(q.price) + (q.unit ? '/' + esc(q.unit) : '') + '</span>' : '') + '</button>'; }).join('') + '</div></div>' : '') +
     '<label class="f">الحاجة<input id="curName" class="inp" list="catalogList" data-bind="draft.cur.name" value="' + esc(c.name) + '" placeholder="مثلاً: بيض 30 أو فاتورة كهربا"></label>' +
     '<datalist id="catalogList">' + mergedCatalog().map(function (q) { return '<option value="' + esc(q.name) + '">'; }).join('') + '</datalist>' +
     '<div class="grid2" style="gap:12px"><div style="display:flex;flex-direction:column;gap:6px"><span class="sb" style="font-size:14px">الكمية</span><div class="stepper"><button data-a="qty" data-d="1" aria-label="زوّد">+</button><input id="curQty" type="number" inputmode="decimal" step="any" data-bind="draft.cur.qty" value="' + esc(c.qty) + '" aria-label="الكمية"><button data-a="qty" data-d="-1" aria-label="قلّل">−</button></div></div>' +
-    '<label class="f">سعر الواحدة (ج.م)<input id="curPrice" class="inp" type="number" inputmode="decimal" step="any" data-bind="draft.cur.price" value="' + esc(c.price) + '" placeholder="0"></label></div>' +
+    '<label class="f">الوحدة<select id="curUnit" class="inp" data-bind="draft.cur.unit">' + unitOpts(c.unit) + '</select></label></div>' +
+    '<label class="f"><span id="curPriceLbl">' + priceLbl(c.unit) + '</span><input id="curPrice" class="inp" type="number" inputmode="decimal" step="any" data-bind="draft.cur.price" value="' + esc(c.price) + '" placeholder="0"></label>' +
+    '<span class="xs muted" id="curHint" style="margin-top:-8px">' + curHint() + '</span>' +
     '<div style="display:flex;flex-direction:column;gap:8px"><span class="sb" style="font-size:14px">التصنيف</span><div class="grid2">' + cats.map(function (k) { return '<button class="catbtn' + (c.category === k.id ? ' on' : '') + '" data-a="pickCat" data-id="' + k.id + '">' + esc(k.name) + '</button>'; }).join('') + '</div></div>' +
     '<button class="btn soft full" data-a="addLine">+ ضيفها للفاتورة</button>' +
     '<section class="card"><h2>تفاصيل</h2><div class="grid2" style="gap:10px"><label class="f">التاريخ<input class="inp" type="date" data-bind="draft.date" value="' + esc(d.date) + '"></label><label class="f">المحل (اختياري)<input class="inp" data-bind="draft.store" value="' + esc(d.store) + '" placeholder="مثلاً: كارفور"></label></div>' +
@@ -398,12 +403,37 @@ function viewAdd() {
     '</main><div class="bottom nonav"><div class="in bar2"><div style="display:flex;flex-direction:column;flex:1"><span class="xs muted">الإجمالي</span><span style="font-size:20px" class="b" id="draftTotal">' + money(draftTotal()) + '</span></div><button class="btn" style="padding:0 32px" data-a="savePurchase">' + (d.id ? 'حفظ' : 'سجّل') + '</button></div></div>';
 }
 var PRESETS = [['عيش', 'food'], ['بيض', 'food'], ['لبن', 'food'], ['زيت', 'food'], ['سكر', 'food'], ['رز', 'food'], ['مكرونة', 'food'], ['شاي', 'food'], ['فراخ', 'food'], ['خضار', 'food'], ['فاكهة', 'food'], ['جبنة', 'food'], ['صابون', 'clean'], ['منظف أطباق', 'clean'], ['مسحوق غسيل', 'clean'], ['مناديل', 'clean'], ['فاتورة كهربا', 'bills'], ['فاتورة غاز', 'bills'], ['فاتورة مية', 'bills']];
+var UNITS = ['عدد', 'كيلو', 'رغيف', 'دستة', 'كرتونة', 'ازازة', 'علبة', 'كيس', 'باكو'];
+var DEF_UNITS = { 'عيش': 'رغيف', 'بيض': 'دستة', 'لبن': 'كيس', 'زيت': 'ازازة', 'سكر': 'كيلو', 'رز': 'كيلو', 'مكرونة': 'كيس', 'شاي': 'علبة', 'فراخ': 'كيلو', 'خضار': 'كيلو', 'فاكهة': 'كيلو', 'جبنة': 'كيلو', 'منظف أطباق': 'ازازة', 'مسحوق غسيل': 'كيس', 'مناديل': 'باكو' };
+function unitOf(u) { return String(u || '').trim() || 'عدد'; }
+function unitOpts(cur) {
+  cur = unitOf(cur); var list = UNITS.slice(); if (list.indexOf(cur) < 0) list.push(cur);
+  return list.map(function (u) { return '<option value="' + esc(u) + '"' + (u === cur ? ' selected' : '') + '>' + esc(u) + '</option>'; }).join('');
+}
+function fmtQty(q) { q = n(q) || 1; return String(Math.round(q * 1000) / 1000); }
+function qtyLabel(q, u) { return fmtQty(q) + ' ' + unitOf(u); }
+function catEntry(name) { var k = String(name || '').trim(); return k ? mergedCatalog().filter(function (c) { return c.name === k; })[0] : null; }
+function defUnit(name) { var c = catEntry(name); return unitOf((c && c.unit) || DEF_UNITS[String(name || '').trim()]); }
+/** آخر سعر اتدفع للحاجة دي بالوحدة دي (نفس منطق السيرفر) */
+function lastPrice(name, unit) {
+  var c = catEntry(name); if (!c) return 0;
+  var u = c.units || {}, w = unitOf(unit);
+  if (u[w]) return u[w];
+  if (u['']) return u[''];
+  return !c.units && unitOf(c.unit) === w ? n(c.price) : 0;
+}
 function mergedCatalog() {
   var st = App.st, seen = {}, out = [];
   var catOk = {}; st.categories.forEach(function (c) { catOk[c.id] = 1; });
   st.catalog.forEach(function (c) { seen[c.name] = 1; out.push(c); });
-  PRESETS.forEach(function (p) { if (!seen[p[0]]) out.push({ name: p[0], category: catOk[p[1]] ? p[1] : st.categories[0].id, price: 0 }); });
+  PRESETS.forEach(function (p) { if (!seen[p[0]]) out.push({ name: p[0], category: catOk[p[1]] ? p[1] : st.categories[0].id, price: 0, unit: DEF_UNITS[p[0]] || '', units: {} }); });
   return out;
+}
+function priceLbl(u) { u = unitOf(u); return (u === 'عدد' ? 'سعر الواحدة' : 'سعر ال' + u) + ' (ج.م)'; }
+function curHint() {
+  var c = App.draft && App.draft.cur; if (!c || !c.name.trim()) return 'السعر بيتكتب لوحده من آخر مرة، وعدّله لو اتغيّر';
+  var p = lastPrice(c.name, c.unit);
+  return p ? 'آخر مرة: ' + fmt(p) + ' ج لل' + unitOf(c.unit) + '. لو السعر اتغيّر عدّله، والجديد هيتحفظ' : 'أول مرة نشتريها بالوحدة دي، السعر هيتحفظ للمرة الجاية';
 }
 function draftTotal() {
   var d = App.draft; if (!d) return 0;
@@ -427,20 +457,29 @@ function viewShopping() {
   var st = App.st, sh = st.shopping;
   var sel = App.selShop, selCount = Object.keys(sel).filter(function (k) { return sel[k]; }).length;
   var open = sh.open.map(function (s) {
-    var on = !!sel[s.id];
+    var on = !!sel[s.id], mine = st.isAdmin || s.byId === st.me.id;
     return '<div class="li"><button class="ibtn" style="' + (on ? 'background:var(--pri);color:#fff;border-color:var(--pri)' : '') + '" data-a="selShop" data-id="' + s.id + '" aria-label="اختار ' + esc(s.name) + '" aria-pressed="' + on + '">' + (on ? IC.check : '') + '</button>' +
-      '<div class="grow"><span class="sb">' + esc(s.name) + '</span><span class="xs muted">' + esc(s.by) + ' · ' + timeAgo(s.at) + '</span></div>' +
-      ((st.isAdmin || s.byId === st.me.id) ? '<button class="x" data-a="delShop" data-id="' + s.id + '" aria-label="شيل">' + IC.trash + '</button>' : '') + '</div>';
+      '<div class="grow"><span><span class="sb">' + esc(s.name) + '</span> <span class="qty">' + esc(qtyLabel(s.qty, s.unit)) + '</span></span>' +
+      '<span class="xs muted">' + (s.price ? 'حوالي ' + fmt(s.est) + ' ج (' + fmt(s.price) + ' لل' + esc(unitOf(s.unit)) + ')' : 'لسه مالهاش سعر') + ' · ' + esc(s.by) + ' · ' + timeAgo(s.at) + '</span></div>' +
+      (mine ? '<button class="x" data-a="editShop" data-id="' + s.id + '" aria-label="عدّل الكمية">' + IC.edit + '</button><button class="x" data-a="delShop" data-id="' + s.id + '" aria-label="شيل">' + IC.trash + '</button>' : '') + '</div>';
   }).join('');
-  var done = sh.done.map(function (s) { return '<div class="li" style="opacity:.6"><div class="grow"><span style="text-decoration:line-through">' + esc(s.name) + '</span></div><button class="btn soft sm" data-a="undoShop" data-id="' + s.id + '">رجّعها</button></div>'; }).join('');
+  var done = sh.done.map(function (s) { return '<div class="li" style="opacity:.6"><div class="grow"><span style="text-decoration:line-through">' + esc(s.name) + ' · ' + esc(qtyLabel(s.qty, s.unit)) + '</span></div><button class="btn soft sm" data-a="undoShop" data-id="' + s.id + '">رجّعها</button></div>'; }).join('');
+  var est = sh.open.length && sh.estTotal ? '<div class="row sm"><span class="muted">المتوقع نصرفه</span><span class="b">حوالي ' + money(sh.estTotal || 0) + '</span></div>' +
+    '' : '';
+  if (sh.noPrice) est += '<span class="xs muted">' + sh.noPrice + (sh.noPrice > 10 ? ' حاجة' : ' حاجات') + ' لسه مالهاش سعر، أول ما تتشرى سعرها هيتحفظ.</span>';
   var due = st.insights && st.insights.dueSoon && st.insights.dueSoon.length ? st.insights.dueSoon.filter(function (nm) { return !sh.open.some(function (o) { return o.name === nm; }); }) : [];
   var dueHtml = due.length ? '<section class="card"><h2>غالباً هيخلصوا قريب</h2><span class="xs muted">محسوبة من مواعيد الشرا اللي فاتت</span><div class="chips">' + due.map(function (nm) { return '<button class="chip sm" data-a="addShopName" data-name="' + esc(nm) + '">+ ' + esc(nm) + '</button>'; }).join('') + '</div></section>' : '';
   return '<header class="top"><div class="t"><small>بتتحدّث على كل الموبايلات</small><h1>قايمة الشراء</h1></div><div class="hbtns"><button class="ibtn" data-a="go" data-v="settings" aria-label="الإعدادات">' + IC.gear + '</button></div></header><main>' +
-    '<div style="display:flex;gap:8px"><input id="shopInput" class="inp" placeholder="ضيف حاجة للقايمة" enterkeyhint="done"><button class="btn sm" data-a="addShop">ضيف</button></div>' +
+    '<section class="card shopadd"><h2>محتاجين إيه؟</h2><input id="shopInput" class="inp" list="catalogList" placeholder="مثلاً: تفاح، عيش، بيض" enterkeyhint="next" autocomplete="off">' +
+    '<datalist id="catalogList">' + mergedCatalog().map(function (q) { return '<option value="' + esc(q.name) + '">'; }).join('') + '</datalist>' +
+    '<div class="qrow"><label class="f">الكمية<input id="shopQty" class="inp" type="number" inputmode="decimal" step="any" min="0" value="1"></label><label class="f">الوحدة<select id="shopUnit" class="inp">' + unitOpts('عدد') + '</select></label><button class="btn" data-a="addShop">ضيف</button></div>' +
+    '<span class="xs muted">مثلاً 2 كيلو تفاح، 10 رغيف عيش، 1 كرتونة بيض</span></section>' +
     '<button class="btn warm full" data-a="ranOut">في حاجة خلصت؟ اختار بسرعة</button>' +
-    '<section class="card" style="gap:4px"><div class="row"><h2>محتاجين نشتري (' + sh.open.length + ')</h2></div>' + (open ? '<div class="list">' + open + '</div>' : '<div class="empty">القايمة فاضية، كله موجود 👌</div>') + '</section>' +
-    dueHtml + (done ? '<section class="card" style="gap:4px"><h2>اتشرى قريب</h2><div class="list">' + done + '</div></section>' : '') + '</main>' +
-    (selCount ? '<div class="bottom"><div class="in"><button class="btn" style="flex:1.4" data-a="buySelected">اشتريتهم، سجّل الأسعار (' + selCount + ')</button><button class="btn ghost" style="flex:1" data-a="markSelected">اتشروا بس</button></div></div>' : '') + nav();
+    '<section class="card" style="gap:4px"><div class="row"><h2>محتاجين نشتري (' + sh.open.length + ')</h2></div>' + est + (open ? '<div class="list">' + open + '</div>' : '<div class="empty">القايمة فاضية، كله موجود 👌</div>') +
+    (open ? '<span class="xs muted">علّم على اللي اشتريته، وبعدين دوس "اشتريناهم" تحت عشان الفلوس تتحسب.</span>' : '') + '</section>' +
+    dueHtml + (done ? '<section class="card" style="gap:4px"><h2>اشتريناه</h2><div class="list">' + done + '</div></section>' : '') + '</main>' +
+    (selCount ? '<div class="bottom"><div class="in"><button class="btn" style="flex:1.6" data-a="buySelected">اشتريناهم، سجّل الفلوس (' + selCount + ')</button>' +
+      (st.isAdmin ? '<button class="btn ghost" style="flex:1" data-a="confirm" data-do="markShopOnly" data-msg="هتتشال من القايمة من غير ما فلوسها تتحسب في الصرف. استخدمها بس لو حد جابها من برا فلوس البيت ومش عايزين نسجّلها.">من غير فلوس</button>' : '') + '</div></div>' : '') + nav();
 }
 
 /* ---------- التحليلات ---------- */
@@ -536,7 +575,7 @@ function viewSettings() {
   var log = '<details class="card"><summary>آخر التعديلات</summary><div class="list">' + a.log.slice(0, 25).map(function (l) { return '<div class="li"><div class="grow"><span class="sm">' + esc(l.who) + ' · ' + esc(ACTION_NAMES[l.action] || l.action) + '</span><span class="xs muted" style="white-space:normal">' + esc(l.detail) + ' · ' + timeAgo(l.at) + '</span></div></div>'; }).join('') + '</div></details>';
   return subHeader('الإعدادات') + '<main>' + mine + house + members + privacy + cats + backup + log + '<p class="xs muted" style="text-align:center">ميزانية البيت · نسخة 1.0</p></main>' + nav();
 }
-var ACTION_NAMES = { addPurchase: 'سجّل مشتريات', updatePurchase: 'عدّل مشتريات', deletePurchase: 'مسح مشتريات', addContribution: 'سجّل مساهمة', updateContribution: 'عدّل مساهمة', deleteContribution: 'مسح مساهمة', settle: 'سدّد فلوس', addShopping: 'ضاف لقايمة الشراء', toggleShopping: 'علّم في القايمة', deleteShopping: 'شال من القايمة', saveCategory: 'عدّل تصنيف', deleteCategory: 'مسح تصنيف', applyBudgets: 'حدّث الميزانيات', saveFund: 'عدّل تحويشة', deleteFund: 'مسح تحويشة', fundTx: 'حركة تحويش', saveSettings: 'غيّر الإعدادات', saveMember: 'عدّل فرد', changePin: 'غيّر رقمه السري', backupNow: 'نسخة احتياطية', backupToDrive: 'نسخة احتياطية', restore: 'استرجاع نسخة' };
+var ACTION_NAMES = { addPurchase: 'سجّل مشتريات', updatePurchase: 'عدّل مشتريات', deletePurchase: 'مسح مشتريات', addContribution: 'سجّل مساهمة', updateContribution: 'عدّل مساهمة', deleteContribution: 'مسح مساهمة', settle: 'سدّد فلوس', addShopping: 'ضاف لقايمة الشراء', updateShopping: 'عدّل كمية في القايمة', toggleShopping: 'علّم في القايمة', deleteShopping: 'شال من القايمة', saveCategory: 'عدّل تصنيف', deleteCategory: 'مسح تصنيف', applyBudgets: 'حدّث الميزانيات', saveFund: 'عدّل تحويشة', deleteFund: 'مسح تحويشة', fundTx: 'حركة تحويش', saveSettings: 'غيّر الإعدادات', saveMember: 'عدّل فرد', changePin: 'غيّر رقمه السري', backupNow: 'نسخة احتياطية', backupToDrive: 'نسخة احتياطية', restore: 'استرجاع نسخة' };
 
 /* ============ النوافذ اللي بتطلع من تحت ============ */
 function renderSheet() {
@@ -550,6 +589,13 @@ function openSheet(s) { App.sheet = s; renderSheet(); }
 function closeSheet() { App.sheet = null; renderSheet(); if (App.pendingRender) render(); }
 
 var SHEETS = {
+  shopEdit: function (s) {
+    var p = lastPrice(s.name, s.unit);
+    return sheetHead(s.name) + '<div class="grid2" style="gap:12px"><div style="display:flex;flex-direction:column;gap:6px"><span class="sb" style="font-size:14px">الكمية</span><div class="stepper"><button data-a="shopEditQty" data-d="1" aria-label="زوّد">+</button><input id="seQty" type="number" inputmode="decimal" step="any" value="' + esc(s.qty) + '" aria-label="الكمية"><button data-a="shopEditQty" data-d="-1" aria-label="قلّل">−</button></div></div>' +
+      '<label class="f">الوحدة<select id="seUnit" class="inp">' + unitOpts(s.unit) + '</select></label></div>' +
+      '<span class="xs muted">' + (p ? 'آخر سعر: ' + fmt(p) + ' ج لل' + esc(unitOf(s.unit)) + '، يعني حوالي ' + money(p * n(s.qty)) : 'لسه مالهاش سعر بالوحدة دي') + '</span>' +
+      '<button class="btn full" data-a="shopEditSave">احفظ</button>';
+  },
   ranout: function (s) {
     var open = {}; App.st.shopping.open.forEach(function (o) { open[o.name] = 1; });
     var opts = mergedCatalog().filter(function (c) { return !open[c.name]; }).slice(0, 18);
@@ -590,7 +636,7 @@ var SHEETS = {
     if (!p) return sheetHead('العملية مش موجودة');
     var can = st.isAdmin || p.createdBy === st.me.id;
     return sheetHead(dateLabel(p.date) + (p.store ? ' · ' + p.store : '')) +
-      '<div class="list">' + p.items.map(function (i) { return '<div class="li"><div class="grow"><span>' + esc(i.name) + '</span><span class="xs muted">' + esc(catName(i.category)) + ' · ' + i.qty + ' × ' + fmt(i.price) + '</span></div><span class="sb">' + fmt(i.cost) + '</span></div>'; }).join('') + '</div>' +
+      '<div class="list">' + p.items.map(function (i) { return '<div class="li"><div class="grow"><span>' + esc(i.name) + '</span><span class="xs muted">' + esc(catName(i.category)) + ' · ' + esc(qtyLabel(i.qty, i.unit)) + ' × ' + fmt(i.price) + '</span></div><span class="sb">' + fmt(i.cost) + '</span></div>'; }).join('') + '</div>' +
       '<div class="row"><span class="b">الإجمالي</span><span class="b">' + money(p.total) + '</span></div>' +
       '<div class="xs muted">سجّلها ' + esc(p.createdByName || '') + (p.paidByName ? ' · دفعها من جيبه ' + esc(p.paidByName) : ' · من فلوس البيت') + '</div>' +
       (can ? '<div class="grid2"><button class="btn soft sm" data-a="editPurchase" data-id="' + p.id + '">تعديل</button><button class="btn danger sm" data-a="confirm" data-msg="تمسح العملية دي؟" data-do="deletePurchase" data-id="' + p.id + '">مسح</button></div>' : '');
@@ -702,10 +748,28 @@ var A = {
     var names = Object.keys(App.sheet.picked).filter(function (k) { return App.sheet.picked[k]; });
     if (!names.length) return toast('اختار حاجة الأول', true);
     App.sheet = null; renderSheet();
-    act('addShopping', { names: names }, 'اتضافت لقايمة الشراء، والكل هيشوفها', 'بنبعت...').catch(function () { });
+    act('addShopping', { items: names.map(function (nm) { return { name: nm, unit: defUnit(nm) }; }) }, 'اتضافت لقايمة الشراء، والكل هيشوفها. تقدر تعدّل الكمية من القايمة', 'بنبعت...').catch(function () { });
   },
-  addShop: function () { var v = val('shopInput').trim(); if (!v) return; act('addShopping', { names: [v] }, 'اتضافت').catch(function () { }); },
-  addShopName: function (d) { act('addShopping', { names: [d.name] }, 'اتضافت').catch(function () { }); },
+  addShop: function () {
+    var v = val('shopInput').trim(); if (!v) return toast('اكتب اسم الحاجة', true);
+    var q = n(val('shopQty')) || 1, u = val('shopUnit') || defUnit(v);
+    act('addShopping', { items: [{ name: v, qty: q, unit: u }] }, 'اتضافت: ' + v + ' ' + qtyLabel(q, u)).catch(function () { });
+  },
+  addShopName: function (d) { act('addShopping', { items: [{ name: d.name, unit: defUnit(d.name) }] }, 'اتضافت').catch(function () { }); },
+  editShop: function (d) {
+    var s = App.st.shopping.open.filter(function (x) { return x.id === d.id; })[0]; if (!s) return;
+    openSheet({ type: 'shopEdit', id: s.id, name: s.name, qty: fmtQty(s.qty), unit: unitOf(s.unit) });
+  },
+  shopEditQty: function (d) {
+    var s = App.sheet; s.unit = val('seUnit') || s.unit; s.qty = val('seQty') || s.qty;
+    var step = s.unit === 'كيلو' ? 0.5 : 1;
+    s.qty = fmtQty(Math.max(step, n(s.qty) + n(d.d) * step)); renderSheet();
+  },
+  shopEditSave: function () {
+    var s = App.sheet; var q = n(val('seQty')) || 1, u = val('seUnit') || s.unit;
+    App.sheet = null; renderSheet();
+    act('updateShopping', { id: s.id, name: s.name, qty: q, unit: u }, 'اتعدّلت').catch(function () { });
+  },
   selShop: function (d) { App.selShop[d.id] = !App.selShop[d.id]; render(true); },
   delShop: function (d) { delete App.selShop[d.id]; act('deleteShopping', { id: d.id }).catch(function () { }); },
   undoShop: function (d) { act('toggleShopping', { id: d.id }).catch(function () { }); },
@@ -720,10 +784,11 @@ var A = {
     var cat = mergedCatalog();
     var items = st.shopping.open.filter(function (s) { return ids.indexOf(s.id) >= 0; }).map(function (s) {
       var c = cat.filter(function (x) { return x.name === s.name; })[0];
-      return { name: s.name, qty: '1', price: c && c.price ? String(c.price) : '', category: (c && c.category) || s.category || guessCat(s.name) };
+      var u = unitOf(s.unit), pr = s.price || lastPrice(s.name, u);
+      return { name: s.name, qty: fmtQty(s.qty), unit: u, price: pr ? String(pr) : '', category: (c && c.category) || s.category || guessCat(s.name) };
     });
     App.selShop = {};
-    App.draft = newDraft({ items: items, shoppingIds: ids, msg: 'اكتب سعر كل حاجة وبعدين سجّل', msgOk: true });
+    App.draft = newDraft({ items: items, shoppingIds: ids, msg: 'راجع الكمية والسعر اللي اشتريت بيه فعلاً (لو السعر اتغيّر عدّله)، وبعدين دوس سجّل', msgOk: true });
     App.backView = 'list'; App.view = 'add'; render(true); window.scrollTo(0, 0);
   },
 
@@ -731,18 +796,23 @@ var A = {
   newPurchase: function () { App.draft = newDraft(); App.backView = App.view === 'add' ? 'home' : App.view; App.view = 'add'; render(true); window.scrollTo(0, 0); },
   quickAdd: function (d) {
     var q = mergedCatalog()[+d.i]; if (!q) return;
-    App.draft.items.push({ name: q.name, qty: '1', price: q.price ? String(q.price) : '', category: q.category });
+    var u = defUnit(q.name), pr = lastPrice(q.name, u);
+    App.draft.items.push({ name: q.name, qty: '1', unit: u, price: pr ? String(pr) : '', category: q.category });
     App.draft.msg = ''; render(true);
-    if (!q.price) toast('اتضافت، اكتب سعرها في الفاتورة فوق');
+    if (!pr) toast('اتضافت، اكتب سعرها في الفاتورة فوق');
   },
-  qty: function (d) { var c = App.draft.cur; c.qty = String(Math.max(1, n(val('curQty') || c.qty) + n(d.d))); $('curQty').value = c.qty; refreshTotal(); },
+  qty: function (d) {
+    var c = App.draft.cur; c.unit = val('curUnit') || c.unit;
+    var step = unitOf(c.unit) === 'كيلو' ? 0.5 : 1;
+    c.qty = fmtQty(Math.max(step, n(val('curQty') || c.qty) + n(d.d) * step)); $('curQty').value = c.qty; refreshTotal();
+  },
   pickCat: function (d) { syncCur(); App.draft.cur.category = d.id; render(true); },
   addLine: function () {
     syncCur();
     var c = App.draft.cur;
     if (!c.name.trim()) return toast('اكتب اسم الحاجة', true);
-    App.draft.items.push({ name: c.name.trim(), qty: c.qty || '1', price: c.price, category: c.category || guessCat(c.name) });
-    App.draft.cur = { name: '', qty: '1', price: '', category: '' }; App.draft.msg = '';
+    App.draft.items.push({ name: c.name.trim(), qty: c.qty || '1', unit: unitOf(c.unit), price: c.price, category: c.category || guessCat(c.name) });
+    App.draft.cur = { name: '', qty: '1', unit: 'عدد', price: '', category: '' }; App.draft.msg = '';
     render(true);
   },
   delLine: function (d) { App.draft.items.splice(+d.i, 1); render(true); },
@@ -750,7 +820,7 @@ var A = {
   savePurchase: function () {
     syncCur();
     var d = App.draft, items = d.items.slice();
-    if (d.cur.name.trim()) items.push({ name: d.cur.name.trim(), qty: d.cur.qty || '1', price: d.cur.price, category: d.cur.category || guessCat(d.cur.name) });
+    if (d.cur.name.trim()) items.push({ name: d.cur.name.trim(), qty: d.cur.qty || '1', unit: unitOf(d.cur.unit), price: d.cur.price, category: d.cur.category || guessCat(d.cur.name) });
     items = items.filter(function (i) { return String(i.name).trim(); });
     if (!items.length) return toast('ضيف حاجة واحدة على الأقل', true);
     var noPrice = items.filter(function (i) { return !n(i.price); });
@@ -801,7 +871,7 @@ var A = {
     d.msg = 'لقيت ' + r.items.length + ' أصناف' + (r.skipped ? ' (وسبت ' + r.skipped + ' سطر مش مفهوم)' : '') + '. راجعهم وعدّل أي حاجة قبل ما تحفظ.';
     App.sheet = null; render(true); window.scrollTo(0, 0);
   },
-  addEmptyLine: function () { App.draft.items.push({ name: '', qty: '1', unit: '', price: '', category: App.st.categories[0].id }); render(true); },
+  addEmptyLine: function () { App.draft.items.push({ name: '', qty: '1', unit: 'عدد', price: '', category: App.st.categories[0].id }); render(true); },
 
   /* المساهمات */
   contribSheet: function (d) { openSheet({ type: 'contrib', id: d.id, status: 'received' }); },
@@ -930,6 +1000,7 @@ var A = {
       deleteCategory: ['deleteCategory', { id: s.id }, 'اتمسح'],
       removeMember: ['saveMember', { id: s.id, active: false }, 'اتشال']
     }[s.act];
+    if (s.act === 'markShopOnly') { renderSheet(); return A.markSelected(); }
     if (map) act(map[0], map[1], map[2]).catch(function () { });
     else renderSheet();
   }
@@ -941,7 +1012,15 @@ function syncCur() {
   if ($('curName')) c.name = $('curName').value;
   if ($('curQty')) c.qty = $('curQty').value;
   if ($('curPrice')) c.price = $('curPrice').value;
+  if ($('curUnit')) c.unit = $('curUnit').value;
   if (c.name && !c.category) c.category = guessCat(c.name);
+}
+function curAutoPrice() {
+  var c = App.draft.cur, p = lastPrice(c.name, c.unit);
+  if (!n(c.price) || c.price === c.autoPrice) { c.price = p ? String(p) : ''; c.autoPrice = c.price; if ($('curPrice')) $('curPrice').value = c.price; }
+  if ($('curPriceLbl')) $('curPriceLbl').textContent = priceLbl(c.unit);
+  if ($('curHint')) $('curHint').textContent = curHint();
+  refreshTotal();
 }
 function refreshTotal() { var e = $('draftTotal'); if (e) e.textContent = money(draftTotal()); var c = $('pasteCheck'); if (c) c.innerHTML = pasteCheckHtml(); }
 
@@ -968,15 +1047,25 @@ document.addEventListener('change', function (e) {
   }
   if (el.getAttribute('data-rerender')) { el.blur(); render(true); }
   if (el.id === 'curName' && App.draft) {
-    var c = guessCat(el.value); App.draft.cur.category = c;
+    var c = guessCat(el.value), cur = App.draft.cur; cur.category = c;
     document.querySelectorAll('[data-a="pickCat"]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-id') === c); });
+    if (catEntry(el.value)) { cur.unit = defUnit(el.value); if ($('curUnit')) $('curUnit').value = cur.unit; }
+    curAutoPrice();
   }
+  if (el.id === 'curUnit' && App.draft) { App.draft.cur.unit = el.value; curAutoPrice(); }
+  if (el.hasAttribute('data-line') && App.draft) {
+    var it = App.draft.items[+el.getAttribute('data-line')];
+    if (it) { var pr = lastPrice(it.name, it.unit); if (pr && (!n(it.price) || it.autoPrice === it.price)) { it.price = String(pr); it.autoPrice = it.price; render(true); } }
+  }
+  if (el.id === 'shopInput' && $('shopUnit') && (catEntry(el.value) || DEF_UNITS[el.value.trim()])) $('shopUnit').value = defUnit(el.value);
+  if (el.id === 'seUnit' && App.sheet) { App.sheet.unit = el.value; App.sheet.qty = val('seQty') || App.sheet.qty; renderSheet(); }
 });
 document.addEventListener('keydown', function (e) {
   if (e.key !== 'Enter') return;
   var id = e.target.id;
   if (id === 'pin') A.login();
-  if (id === 'shopInput') A.addShop();
+  if (id === 'shopInput') { e.preventDefault(); var q = $('shopQty'); if (q) { q.focus(); q.select(); } }
+  if (id === 'shopQty') A.addShop();
   if (id === 'ranOther') A.ranOtherAdd();
 });
 
