@@ -372,7 +372,7 @@ function viewAdd() {
   var c = d.cur;
   var lines = d.items.map(function (it, i) {
     return '<div class="line"><input class="inp nm" data-bind="draft.items.' + i + '.name" value="' + esc(it.name) + '" aria-label="الحاجة"><button class="x" data-a="delLine" data-i="' + i + '" aria-label="شيل">' + IC.x + '</button>' +
-      '<input class="inp" type="number" inputmode="decimal" step="any" data-bind="draft.items.' + i + '.qty" data-total="1" value="' + esc(it.qty) + '" aria-label="الكمية">' +
+      '<input class="inp" type="text" autocomplete="off" placeholder="1 أو نص" data-bind="draft.items.' + i + '.qty" data-total="1" value="' + esc(it.qty) + '" aria-label="الكمية">' +
       '<select class="inp un" data-bind="draft.items.' + i + '.unit" data-line="' + i + '" aria-label="الوحدة">' + unitOpts(it.unit) + '</select>' +
       '<input class="inp" type="number" inputmode="decimal" step="any" data-bind="draft.items.' + i + '.price" data-total="1" value="' + esc(it.price) + '" placeholder="السعر" aria-label="سعر الوحدة">' +
       '<select class="inp ct" data-bind="draft.items.' + i + '.category" aria-label="التصنيف">' + cats.map(function (k) { return '<option value="' + k.id + '"' + (k.id === it.category ? ' selected' : '') + '>' + esc(k.name) + '</option>'; }).join('') + '</select></div>';
@@ -391,7 +391,7 @@ function viewAdd() {
     (quick.length ? '<div style="display:flex;flex-direction:column;gap:8px"><span class="sm muted">اشتريته قبل كده؟ دوسة واحدة</span><div class="chips">' + quick.map(function (q, i) { return '<button class="chip sm" data-a="quickAdd" data-i="' + i + '">' + esc(q.name) + (q.price ? ' <span class="xs muted">' + fmt(q.price) + (q.unit ? '/' + esc(q.unit) : '') + '</span>' : '') + '</button>'; }).join('') + '</div></div>' : '') +
     '<label class="f">الحاجة<input id="curName" class="inp" list="catalogList" data-bind="draft.cur.name" value="' + esc(c.name) + '" placeholder="مثلاً: بيض 30 أو فاتورة كهربا"></label>' +
     '<datalist id="catalogList">' + mergedCatalog().map(function (q) { return '<option value="' + esc(q.name) + '">'; }).join('') + '</datalist>' +
-    '<div class="grid2" style="gap:12px"><div style="display:flex;flex-direction:column;gap:6px"><span class="sb" style="font-size:14px">الكمية</span><div class="stepper"><button data-a="qty" data-d="1" aria-label="زوّد">+</button><input id="curQty" type="number" inputmode="decimal" step="any" data-bind="draft.cur.qty" value="' + esc(c.qty) + '" aria-label="الكمية"><button data-a="qty" data-d="-1" aria-label="قلّل">−</button></div></div>' +
+    '<div class="grid2" style="gap:12px"><div style="display:flex;flex-direction:column;gap:6px"><span class="sb" style="font-size:14px">الكمية</span><div class="stepper"><button data-a="qty" data-d="1" aria-label="زوّد">+</button><input id="curQty" type="text" autocomplete="off" placeholder="1 أو نص" data-bind="draft.cur.qty" value="' + esc(c.qty) + '" aria-label="الكمية"><button data-a="qty" data-d="-1" aria-label="قلّل">−</button></div></div>' +
     '<label class="f">الوحدة<select id="curUnit" class="inp" data-bind="draft.cur.unit">' + unitOpts(c.unit) + '</select></label></div>' +
     '<label class="f"><span id="curPriceLbl">' + priceLbl(c.unit) + '</span><input id="curPrice" class="inp" type="number" inputmode="decimal" step="any" data-bind="draft.cur.price" value="' + esc(c.price) + '" placeholder="0"></label>' +
     '<span class="xs muted" id="curHint" style="margin-top:-8px">' + curHint() + '</span>' +
@@ -410,7 +410,34 @@ function unitOpts(cur) {
   cur = unitOf(cur); var list = UNITS.slice(); if (list.indexOf(cur) < 0) list.push(cur);
   return list.map(function (u) { return '<option value="' + esc(u) + '"' + (u === cur ? ' selected' : '') + '>' + esc(u) + '</option>'; }).join('');
 }
-function fmtQty(q) { q = n(q) || 1; return String(Math.round(q * 1000) / 1000); }
+/* v1.4.1: الكمية تقبل كسور وكلام: 0.5، ٠٫٥، 1/2، نص، ربع، تلت تربع، كيلو ونص، 2 وربع، 3 الا ربع */
+var QTY_WORDS = { 'نص': 0.5, 'نصف': 0.5, 'ربع': 0.25, 'تلت': 1 / 3, 'ثلث': 1 / 3, 'تلتين': 2 / 3, 'ثلثين': 2 / 3,
+  'تلتتربع': 0.75, 'تلاتتربع': 0.75, 'تلاتةتربع': 0.75, 'ثلاثةارباع': 0.75, 'ثلاثأرباع': 0.75, 'ثلاثارباع': 0.75, 'ثلاثةأرباع': 0.75,
+  'واحد': 1, 'كيلو': 1, 'اتنين': 2, 'اثنين': 2, 'كيلوين': 2, 'تلاتة': 3, 'تلاته': 3, 'ثلاثة': 3, 'اربعة': 4, 'اربعه': 4, 'أربعة': 4, 'خمسة': 5, 'خمسه': 5 };
+function qtyBase(t) {
+  if (!t) return null;
+  if (/^\d+(\.\d+)?$/.test(t)) return Number(t);
+  var m = t.match(/^(\d+)\/(\d+)$/); if (m && +m[2]) return +m[1] / +m[2];
+  if (QTY_WORDS[t] !== undefined) return QTY_WORDS[t];
+  return null;
+}
+function parseQty(v) {
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  var t = normDigits(v).replace(/,/g, '.').replace(/[إأآ]/g, 'ا').replace(/\s+/g, ' ').trim()
+    .replace(/(.)\s*(كيلو\s*جرام|كيلوجرام|كجم|كيلو|kg)$/i, '$1').replace(/\s*(جرام|جم|g)$/i, function () { return ' g'; });
+  var gram = / g$/.test(t); t = t.replace(/ g$/, '');
+  var mx = t.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (mx && +mx[3]) { var mr = +mx[1] + mx[2] / mx[3]; return Math.round((gram ? mr / 1000 : mr) * 1000) / 1000; }
+  t = t.replace(/\s+/g, '').replace(/^(كيلو(?=و|الا|إلا))/, '1').replace(/^كيلو(?=\d)/, '');
+  var r = null, m;
+  if ((m = t.match(/^(.+?)(?:ال|إل)ا(نص|ربع|تلت|ثلث)$/))) { var a = qtyBase(m[1]); if (a !== null) r = a - QTY_WORDS[m[2]]; }
+  else if ((m = t.match(/^(.+?)و(نص|نصف|ربع|تلت|ثلث|تلتين|ثلثين)$/))) { var b = qtyBase(m[1]); if (b !== null) r = b + QTY_WORDS[m[2]]; }
+  else r = qtyBase(t);
+  if (r === null || !isFinite(r) || r < 0) return 0;
+  if (gram) r = r / 1000;
+  return Math.round(r * 1000) / 1000;
+}
+function fmtQty(q) { q = parseQty(q) || 1; return String(Math.round(q * 1000) / 1000); }
 function qtyLabel(q, u) { return fmtQty(q) + ' ' + unitOf(u); }
 function catEntry(name) { var k = String(name || '').trim(); return k ? mergedCatalog().filter(function (c) { return c.name === k; })[0] : null; }
 function defUnit(name) { var c = catEntry(name); return unitOf((c && c.unit) || DEF_UNITS[String(name || '').trim()]); }
@@ -437,8 +464,8 @@ function curHint() {
 }
 function draftTotal() {
   var d = App.draft; if (!d) return 0;
-  var t = d.items.reduce(function (s, i) { return s + n(i.qty || 1) * n(i.price); }, 0);
-  if (d.cur.name && n(d.cur.price)) t += n(d.cur.qty || 1) * n(d.cur.price);
+  var t = d.items.reduce(function (s, i) { return s + (parseQty(i.qty) || 1) * n(i.price); }, 0);
+  if (d.cur.name && n(d.cur.price)) t += (parseQty(d.cur.qty) || 1) * n(d.cur.price);
   return t;
 }
 function guessCat(name) {
@@ -472,7 +499,7 @@ function viewShopping() {
   return '<header class="top"><div class="t"><small>بتتحدّث على كل الموبايلات</small><h1>قايمة الشراء</h1></div><div class="hbtns"><button class="ibtn" data-a="go" data-v="settings" aria-label="الإعدادات">' + IC.gear + '</button></div></header><main>' +
     '<section class="card shopadd"><h2>محتاجين إيه؟</h2><input id="shopInput" class="inp" list="catalogList" placeholder="مثلاً: تفاح، عيش، بيض" enterkeyhint="next" autocomplete="off">' +
     '<datalist id="catalogList">' + mergedCatalog().map(function (q) { return '<option value="' + esc(q.name) + '">'; }).join('') + '</datalist>' +
-    '<div class="qrow"><label class="f">الكمية<input id="shopQty" class="inp" type="number" inputmode="decimal" step="any" min="0" value="1"></label><label class="f">الوحدة<select id="shopUnit" class="inp">' + unitOpts('عدد') + '</select></label><button class="btn" data-a="addShop">ضيف</button></div>' +
+    '<div class="qrow"><label class="f">الكمية<input id="shopQty" class="inp" type="text" autocomplete="off" placeholder="1 أو نص" value="1"></label><label class="f">الوحدة<select id="shopUnit" class="inp">' + unitOpts('عدد') + '</select></label><button class="btn" data-a="addShop">ضيف</button></div>' +
     '<span class="xs muted">مثلاً 2 كيلو تفاح، 10 رغيف عيش، 1 كرتونة بيض</span></section>' +
     '<button class="btn warm full" data-a="ranOut">في حاجة خلصت؟ اختار بسرعة</button>' +
     '<section class="card" style="gap:4px"><div class="row"><h2>محتاجين نشتري (' + sh.open.length + ')</h2></div>' + est + (open ? '<div class="list">' + open + '</div>' : '<div class="empty">القايمة فاضية، كله موجود 👌</div>') +
@@ -591,9 +618,9 @@ function closeSheet() { App.sheet = null; renderSheet(); if (App.pendingRender) 
 var SHEETS = {
   shopEdit: function (s) {
     var p = lastPrice(s.name, s.unit);
-    return sheetHead(s.name) + '<div class="grid2" style="gap:12px"><div style="display:flex;flex-direction:column;gap:6px"><span class="sb" style="font-size:14px">الكمية</span><div class="stepper"><button data-a="shopEditQty" data-d="1" aria-label="زوّد">+</button><input id="seQty" type="number" inputmode="decimal" step="any" value="' + esc(s.qty) + '" aria-label="الكمية"><button data-a="shopEditQty" data-d="-1" aria-label="قلّل">−</button></div></div>' +
+    return sheetHead(s.name) + '<div class="grid2" style="gap:12px"><div style="display:flex;flex-direction:column;gap:6px"><span class="sb" style="font-size:14px">الكمية</span><div class="stepper"><button data-a="shopEditQty" data-d="1" aria-label="زوّد">+</button><input id="seQty" type="text" autocomplete="off" placeholder="1 أو نص" value="' + esc(s.qty) + '" aria-label="الكمية"><button data-a="shopEditQty" data-d="-1" aria-label="قلّل">−</button></div></div>' +
       '<label class="f">الوحدة<select id="seUnit" class="inp">' + unitOpts(s.unit) + '</select></label></div>' +
-      '<span class="xs muted">' + (p ? 'آخر سعر: ' + fmt(p) + ' ج لل' + esc(unitOf(s.unit)) + '، يعني حوالي ' + money(p * n(s.qty)) : 'لسه مالهاش سعر بالوحدة دي') + '</span>' +
+      '<span class="xs muted">' + (p ? 'آخر سعر: ' + fmt(p) + ' ج لل' + esc(unitOf(s.unit)) + '، يعني حوالي ' + money(p * (parseQty(s.qty) || 1)) : 'لسه مالهاش سعر بالوحدة دي') + '</span>' +
       '<button class="btn full" data-a="shopEditSave">احفظ</button>';
   },
   ranout: function (s) {
@@ -752,7 +779,7 @@ var A = {
   },
   addShop: function () {
     var v = val('shopInput').trim(); if (!v) return toast('اكتب اسم الحاجة', true);
-    var q = n(val('shopQty')) || 1, u = val('shopUnit') || defUnit(v);
+    var q = parseQty(val('shopQty')) || 1, u = val('shopUnit') || defUnit(v);
     act('addShopping', { items: [{ name: v, qty: q, unit: u }] }, 'اتضافت: ' + v + ' ' + qtyLabel(q, u)).catch(function () { });
   },
   addShopName: function (d) { act('addShopping', { items: [{ name: d.name, unit: defUnit(d.name) }] }, 'اتضافت').catch(function () { }); },
@@ -762,11 +789,11 @@ var A = {
   },
   shopEditQty: function (d) {
     var s = App.sheet; s.unit = val('seUnit') || s.unit; s.qty = val('seQty') || s.qty;
-    var step = s.unit === 'كيلو' ? 0.5 : 1;
-    s.qty = fmtQty(Math.max(step, n(s.qty) + n(d.d) * step)); renderSheet();
+    var step = unitOf(s.unit) === 'كيلو' ? 0.25 : 1;
+    s.qty = fmtQty(Math.max(step, (parseQty(s.qty) || 1) + n(d.d) * step)); renderSheet();
   },
   shopEditSave: function () {
-    var s = App.sheet; var q = n(val('seQty')) || 1, u = val('seUnit') || s.unit;
+    var s = App.sheet; var q = parseQty(val('seQty')) || 1, u = val('seUnit') || s.unit;
     App.sheet = null; renderSheet();
     act('updateShopping', { id: s.id, name: s.name, qty: q, unit: u }, 'اتعدّلت').catch(function () { });
   },
@@ -803,8 +830,8 @@ var A = {
   },
   qty: function (d) {
     var c = App.draft.cur; c.unit = val('curUnit') || c.unit;
-    var step = unitOf(c.unit) === 'كيلو' ? 0.5 : 1;
-    c.qty = fmtQty(Math.max(step, n(val('curQty') || c.qty) + n(d.d) * step)); $('curQty').value = c.qty; refreshTotal();
+    var step = unitOf(c.unit) === 'كيلو' ? 0.25 : 1;
+    c.qty = fmtQty(Math.max(step, (parseQty(val('curQty') || c.qty) || 1) + n(d.d) * step)); $('curQty').value = c.qty; refreshTotal();
   },
   pickCat: function (d) { syncCur(); App.draft.cur.category = d.id; render(true); },
   addLine: function () {
@@ -826,7 +853,7 @@ var A = {
     var noPrice = items.filter(function (i) { return !n(i.price); });
     if (noPrice.length) return toast('في حاجات من غير سعر: ' + noPrice.map(function (i) { return i.name; }).join('، '), true);
     var payload = { id: d.id, date: d.date, store: d.store, paidBy: d.paidBy, shoppingIds: d.shoppingIds, note: d.note,
-      items: items.map(function (i) { return { name: i.name, qty: n(i.qty) || 1, unit: i.unit || '', price: n(i.price), category: i.category }; }) };
+      items: items.map(function (i) { return { name: i.name, qty: parseQty(i.qty) || 1, unit: i.unit || '', price: n(i.price), category: i.category }; }) };
     call(d.id ? 'updatePurchase' : 'addPurchase', payload, { label: 'بنسجّل...' }).then(function () {
       App.draft = null; App.view = App.backView && App.backView !== 'add' ? App.backView : 'home'; App.backView = null;
       render(true); window.scrollTo(0, 0);
@@ -1197,7 +1224,7 @@ function parsePasted(text, cats) {
 }
 function pasteCheckHtml() {
   var d = App.draft; if (!d || !d.pasteTotal) return '';
-  var t = d.items.reduce(function (s, i) { return s + n(i.qty || 1) * n(i.price); }, 0);
+  var t = d.items.reduce(function (s, i) { return s + (parseQty(i.qty) || 1) * n(i.price); }, 0);
   var diff = Math.abs(t - d.pasteTotal) > 1;
   return '<div class="alert ' + (diff ? '' : 'g') + ' sm" style="padding:10px 12px"><span style="flex:1">المحسوب <b>' + fmt(t) + '</b> · المكتوب في الفاتورة <b>' + fmt(d.pasteTotal) + '</b>' +
     (diff ? '<br>في فرق ' + fmt(Math.abs(t - d.pasteTotal)) + ' ج.م، راجع الأسعار والكميات' : ' ✓') + '</span></div>';
